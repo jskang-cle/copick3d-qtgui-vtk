@@ -1,5 +1,8 @@
 #include "PointCloudView.hpp"
 
+#include "vtk/vtkCameraOrientationWidgetEx.h"
+#include "vtk/vtkCameraOrientationRepresentationEx.h"
+
 #include <vtkObject.h>
 #include <vtkObjectFactory.h>
 #include <vtkNew.h>
@@ -9,10 +12,9 @@
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkInteractorStyleTerrain.h>
 
 #include <vtkOrientationMarkerWidget.h>
-#include <vtkCameraOrientationWidget.h>
-#include <vtkCameraOrientationRepresentation.h>
 
 #include <vtkPoints.h>
 #include <vtkDataArray.h>
@@ -21,7 +23,8 @@
 #include <vtkSmartPointer.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
-#include <vtkProperty.h>
+#include <vtkPlaneSource.h>
+#include <vtkGlyph3DMapper.h>
 
 #include <vtkAxesActor.h>
 #include <vtkCubeAxesActor.h>
@@ -31,14 +34,19 @@
 #include <vtkElevationFilter.h>
 #include <vtkPolyDataMapper.h>
 
+#include <vtkProperty.h>
 #include <vtkTextProperty.h>
 #include <vtkShaderProperty.h>
 
-#include <algorithm>
 #include <vtkHardwarePicker.h>
+#include <vtkPointPicker.h>
+
+#include <algorithm>
 
 namespace copick3d::qtgui::graphics
 {
+
+using namespace qvtk;
 
 struct PointCloudViewData : vtkObject
 {
@@ -49,12 +57,14 @@ struct PointCloudViewData : vtkObject
 
     vtkNew<vtkRenderer> renderer;
 
-    vtkNew<vtkCameraOrientationWidget> cameraWidget;
-    vtkObject* orientationWidget;
+    vtkNew<vtkCameraOrientationWidgetEx> cameraWidget;
+    vtkNew<vtkOrientationMarkerWidget> orientationWidget;
 
     vtkNew<vtkPoints> points;
     vtkNew<vtkPolyData> polyData;
+    vtkPolyData* polyDataFiltered;
 
+    vtkNew<vtkStatisticalOutlierRemoval> noiseFilter;
     vtkNew<vtkElevationFilter> elevFilter;
     vtkNew<vtkVertexGlyphFilter> glyphFilter;
     vtkNew<vtkPolyDataMapper> mapper;
@@ -65,6 +75,9 @@ struct PointCloudViewData : vtkObject
     vtkNew<vtkFloatArray> positions;
     vtkNew<vtkFloatArray> normals;
     vtkNew<vtkFloatArray> colors;
+
+    vtkNew<vtkPlaneSource> rectSource;
+    vtkNew<vtkGlyph3DMapper> rectMapper;
 };
 
 vtkStandardNewMacro(PointCloudViewData);
@@ -83,29 +96,21 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     renderWindow->SetMultiSamples(8);
     qDebug() << "Mutlisamples:" << renderWindow->GetMultiSamples();
 
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkInteractorStyleTerrain> style;
     style->SetDefaultRenderer(data->renderer);
     renderWindow->GetInteractor()->SetInteractorStyle(style);
-
-    // data->frame = copick3d::Frame::LoadImageSet("D:\\data\\copick_images\\rack\\test_IMG_Texture_8Bit.png");
-    // Vec3fArray points = data->frame.GetPointCloud()->Points();
-    // Vec3fArray normals = data->frame.GetPointCloud()->Normals();
-    // ColorBGRfArray colors = data->frame.GetPointCloud()->Colors();
 
     data->positions->SetNumberOfComponents(3);
     data->positions->SetNumberOfTuples(0);
     data->positions->SetName("Positions");
-    // data->positions->SetVoidArray(points.Data(), points.Size() * 3, 1);
 
     data->normals->SetNumberOfComponents(3);
     data->normals->SetNumberOfTuples(0);
     data->normals->SetName("Normals");
-    // data->normals->SetVoidArray(normals.Data(), normals.Size() * 3, 1);
 
     data->colors->SetNumberOfComponents(3);
     data->colors->SetNumberOfTuples(0);
     data->colors->SetName("Colors");
-    // data->colors->SetNumberOfTuples(colors.Size());
 
     // float* colorsPtr = data->colors->GetPointer(0);
     
@@ -120,32 +125,49 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     data->polyData->GetPointData()->SetNormals(data->normals);
     data->polyData->GetPointData()->SetScalars(data->colors);
 
-// #if !defined(_DEBUG)
-//     vtkNew<vtkStatisticalOutlierRemoval> sor;
-//     sor->SetInputData(data->polyData);
-//     sor->SetSampleSize(100);
-//     sor->SetStandardDeviationFactor(1.0);
-//     sor->Update();
-//     data->polyData->DeepCopy(sor->GetOutput());
-// #endif
+#if !defined(_DEBUG)
+    data->noiseFilter->SetInputData(data->polyData);
+    data->noiseFilter->SetSampleSize(25);
+    data->noiseFilter->SetStandardDeviationFactor(1.0);
+    data->noiseFilter->Update();
+    data->polyDataFiltered = data->noiseFilter->GetOutput();
+#else
+    data->polyDataFiltered = data->polyData;
+#endif
 
-    data->glyphFilter->SetInputData(data->polyData);
-    data->mapper->SetInputConnection(data->glyphFilter->GetOutputPort());
-    data->mapper->SetColorModeToDirectScalars();
+    data->rectSource->SetResolution(1, 1);
+    data->rectSource->SetOrigin(-0.5, -0.5, 0);
+    data->rectSource->SetPoint1(0.5, -0.5, 0);
+    data->rectSource->SetPoint2(-0.5, 0.5, 0);
+    double rotationAxis[3] = {0.0, 1.0, 0.0};
+    data->rectSource->Rotate(90.0, rotationAxis);
+    data->rectSource->Update();
 
-    data->actor->SetMapper(data->mapper);
-    data->actor->GetProperty()->SetPointSize(2);
+    data->rectMapper->SetSourceConnection(data->rectSource->GetOutputPort());
+    data->rectMapper->SetInputData(data->polyDataFiltered);
+    data->rectMapper->SetScaleFactor(0.25);
+    data->rectMapper->OrientOn();
+    data->rectMapper->SetOrientationModeToDirection();
+    data->rectMapper->SetOrientationArray("Normals");
+    data->rectMapper->SetColorModeToDirectScalars();
+
+    // data->glyphFilter->SetInputData(data->polyDataFiltered);
+    // data->mapper->SetInputConnection(data->glyphFilter->GetOutputPort());
+    // data->mapper->SetColorModeToDirectScalars();
+
+    data->actor->SetMapper(data->rectMapper);
+    // data->actor->GetProperty()->SetPointSize(2);
     data->actor->GetProperty()->SetLighting(false);
     data->actor->GetProperty()->SetColor(1.0, 1.0, 1.0);
 
-    auto shader = data->actor->GetShaderProperty();
-    shader->AddVertexShaderReplacement(
-        "//VTK::ValuePass::Impl",  // replace the normal block
-        true,                      // before the standard replacements
-        "gl_PointSize = clamp(500.0 / gl_Position.w, 1.0, 500.0);\n"
-        "///VTK::ValuePass::Impl\n", // we still want the default
-        false                        // only do it once
-    );
+    // auto shader = data->actor->GetShaderProperty();
+    // shader->AddVertexShaderReplacement(
+    //     "//VTK::ValuePass::Impl",  // replace the normal block
+    //     true,                      // before the standard replacements
+    //     "gl_PointSize = clamp(500.0 / gl_Position.w, 1.0, 500.0);\n"
+    //     "///VTK::ValuePass::Impl\n", // we still want the default
+    //     false                        // only do it once
+    // );
 
     data->renderer->AddActor(data->actor);
 
@@ -178,10 +200,10 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     // orientationWidget->InteractiveOff();
     // data->orientationWidget = orientationWidget;
 
-    // data->cameraWidget->SetParentRenderer(data->renderer);
-    // data->cameraWidget->SetInteractor(renderWindow->GetInteractor());
-    // data->cameraWidget->SetEnabled(1);
-    // data->cameraWidget->AnimateOff();
+    data->cameraWidget->SetParentRenderer(data->renderer);
+    data->cameraWidget->SetInteractor(renderWindow->GetInteractor());
+    data->cameraWidget->SetEnabled(1);
+    data->cameraWidget->AnimateOn();
     // data->cameraWidget->SetProcessEvents(false);
 
     auto cam = data->renderer->GetActiveCamera();
@@ -190,9 +212,9 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     cam->SetFocalPoint(0, 0, 1000);
     cam->SetClippingRange(1.0, 2000.0);
 
-    // vtkNew<vtkHardwarePicker> picker;
+    vtkNew<vtkPointPicker> picker;
     // picker->SetSnapToMeshPoint(true);
-    // renderWindow->GetInteractor()->SetPicker(picker);
+    renderWindow->GetInteractor()->SetPicker(picker);
 
     return data;
 }
@@ -205,7 +227,7 @@ void PointCloudView::setFrame(QSharedPointer<copick3d::Frame> frame)
     m_frame = frame;
     Q_EMIT frameChanged(frame);
 
-    dispatch_async([frame](vtkRenderWindow* renderWindow, vtkUserData userData)
+    dispatch_async([this, frame](vtkRenderWindow* renderWindow, vtkUserData userData)
     {
         qDebug() << "Setting frame in render thread:" << (frame ? frame->GetFrameIndex() : -1);
 
@@ -237,11 +259,18 @@ void PointCloudView::setFrame(QSharedPointer<copick3d::Frame> frame)
         data->normals->Modified();
         data->colors->Modified();
 
-        data->cubeAxesActor->SetBounds(data->polyData->GetBounds());
+#if !defined(_DEBUG)
+        data->noiseFilter->Update();
+#endif
+
+        data->cubeAxesActor->SetBounds(data->polyDataFiltered->GetBounds());
 
         data->renderer->ResetCamera();
 
-        qDebug() << "Point cloud updated. Num points:" << data->polyData->GetNumberOfPoints();
+        scheduleRender();
+
+        qDebug() << "Point cloud updated. Num points:" << data->polyData->GetNumberOfPoints() 
+                 << ", Filtered points:" << data->polyDataFiltered->GetNumberOfPoints();
     });
 }
 
@@ -334,6 +363,26 @@ void PointCloudView::updateColorModeImpl(vtkRenderWindow* renderWindow, vtkUserD
     }
 
     renderWindow->Render();
+}
+
+void PointCloudView::printCameraInfo()
+{
+    dispatch_async([](vtkRenderWindow* renderWindow, vtkUserData userData)
+    {
+        auto data = PointCloudViewData::SafeDownCast(userData);
+        if (!data)
+            return;
+
+        auto cam = data->renderer->GetActiveCamera();
+        qDebug() << "Camera Position:" 
+                 << cam->GetPosition()[0] << cam->GetPosition()[1] << cam->GetPosition()[2];
+        qDebug() << "Camera FocalPoint:" 
+                 << cam->GetFocalPoint()[0] << cam->GetFocalPoint()[1] << cam->GetFocalPoint()[2];
+        qDebug() << "Camera ViewUp:" 
+                 << cam->GetViewUp()[0] << cam->GetViewUp()[1] << cam->GetViewUp()[2];
+        qDebug() << "Camera Back:" 
+                 << cam->GetViewPlaneNormal()[0] << cam->GetViewPlaneNormal()[1] << cam->GetViewPlaneNormal()[2];
+    });
 }
 
 } // namespace copick3d::qtgui::graphics

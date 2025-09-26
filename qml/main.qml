@@ -89,6 +89,13 @@ ApplicationWindow {
         model: ["Gray", "Hot", "Cool", "Jet", "HSV", "Pink"]
         currentIndex: 0
       }
+
+      Button {
+        text: "Print Camera Info"
+        onClicked: {
+          pcview.printCameraInfo()
+        }
+      }
     }
   }
 
@@ -114,6 +121,7 @@ ApplicationWindow {
     id: pcview
     anchors.fill: parent
     anchors.margins: 0
+    focus: true
     colorMode: colorModeCombo.currentValue
     frame: loader.frame
   }

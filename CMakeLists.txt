@@ -22,8 +22,9 @@ find_package(VTK REQUIRED
         GUISupportQtQuick
         InteractionStyle
         RenderingAnnotation
+        RenderingFreeType
     HINTS
-        "D:/temp/vtk/build"
+        "D:/lib/vtk"
 )
 
 find_package(copick3d_api REQUIRED
@@ -36,6 +37,13 @@ qt_add_executable(${PROGRAM_NAME}
     src/graphics/PointCloudActor.cpp
     src/graphics/PointCloudView.cpp
     src/graphics/PointCloudLoader.cpp
+
+    src/graphics/qvtk/QQuickVTKItem.cxx
+    src/graphics/qvtk/QQuickVTKInteractor.cxx
+    src/graphics/qvtk/QQuickVTKInteractorAdapter.cxx
+
+    src/graphics/vtk/vtkCameraOrientationRepresentationEx.cxx
+    src/graphics/vtk/vtkCameraOrientationWidgetEx.cxx
 )
 
 qt6_add_resources(${PROGRAM_NAME} ${PROGRAM_NAME}
@@ -68,3 +76,6 @@ add_custom_command(TARGET ${PROGRAM_NAME} POST_BUILD
         $<TARGET_FILE:copick3d_api::copick3d_api>
         $<TARGET_FILE_DIR:${PROGRAM_NAME}>
 )
+
+target_compile_options(${PROGRAM_NAME} PRIVATE "/Zi") # Enable debug information for Release builds
+target_link_options(${PROGRAM_NAME} PRIVATE "/DEBUG") # Link with debug information for Release builds

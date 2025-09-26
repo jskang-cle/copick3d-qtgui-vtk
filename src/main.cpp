@@ -10,19 +10,21 @@
 
 #include <QQuickVTKItem.h>
 
+#include <vtkLogger.h>
+
 #include "graphics/PointCloudView.hpp"
 #include "graphics/PointCloudLoader.hpp"
 
 int main(int argc, char* argv[])
 {
-  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-  QQuickWindow::setSceneGraphBackend("opengl");
   // QQuickVTKItem::setGraphicsApi();
-  
-  vtkSMPTools::SetBackend("sequential");
-  vtkSMPTools::Initialize();
 
-  qDebug() << "Using VTK SMP backend:" << vtkSMPTools::GetBackend();
+  qputenv("QSG_RENDER_LOOP", "basic");
+  qputenv("QSG_NO_VSYNC", "1");
+  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGLRhi);
+  
+  vtkSMPTools::SetBackend("STDThread");
+  vtkSMPTools::Initialize();
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
   QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);

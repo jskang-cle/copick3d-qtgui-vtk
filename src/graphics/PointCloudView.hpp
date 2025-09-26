@@ -1,14 +1,15 @@
 #pragma once
 
-#include <QQuickVTKItem.h>
-#include <QVTKRenderWindowAdapter.h>
+// #include <QQuickVTKItem.h>
+// #include <QVTKRenderWindowAdapter.h>
 
+#include "qvtk/QQuickVTKItem.h"
 #include <copick3d/copick3d_api.hpp>
 
 namespace copick3d::qtgui::graphics
 {
 
-class PointCloudView : public QQuickVTKItem
+class PointCloudView : public copick3d::qtgui::graphics::qvtk::QQuickVTKItem
 {
     enum PointCloudColorMode
     {
@@ -62,6 +63,8 @@ public:
 
     // PointCloudColorMap colorMap() const;
     // void setColorMap(PointCloudColorMap map);
+
+    Q_INVOKABLE void printCameraInfo();
 
 signals:
     void frameChanged(QSharedPointer<copick3d::Frame> frame);
