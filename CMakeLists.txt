@@ -36,6 +36,8 @@ qt_add_executable(${PROGRAM_NAME}
     src/graphics/PointCloudActor.cpp
     src/graphics/PointCloudView.cpp
     src/graphics/PointCloudLoader.cpp
+
+    src/graphics/vtk/CoPickInteractorStyle.cpp
 )
 
 qt6_add_resources(${PROGRAM_NAME} ${PROGRAM_NAME}

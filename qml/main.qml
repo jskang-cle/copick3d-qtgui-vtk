@@ -114,28 +114,8 @@ ApplicationWindow {
     id: pcview
     anchors.fill: parent
     anchors.margins: 0
+    focus: true
     colorMode: colorModeCombo.currentValue
     frame: loader.frame
   }
-
-  // Rectangle {
-  //   id: r
-  //   border { width: 5; color: "steelblue" }
-  //   radius: 5
-  //   color: "pink"
-  //   anchors.fill: parent
-  //   anchors.margins: 100
-
-  //   MyVtkItem {
-  //     id: vtk
-  //     anchors.fill: parent
-  //     anchors.margins: 5
-
-  //     transform: Rotation{
-  //       angle: 0
-  //       origin.x: vtk.width/2
-  //       origin.y: vtk.height/2
-  //     }
-  //   }
-  // }
 }
