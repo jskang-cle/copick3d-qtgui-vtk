@@ -38,6 +38,9 @@ qt_add_executable(${PROGRAM_NAME}
     src/graphics/PointCloudLoader.cpp
 
     src/graphics/vtk/CoPickInteractorStyle.cpp
+    src/graphics/vtk/DepthFilter.cpp
+    src/graphics/vtk/vtkCameraOrientationWidgetEx.cpp
+    src/graphics/vtk/QQuickVTKItemEx.cpp
 )
 
 qt6_add_resources(${PROGRAM_NAME} ${PROGRAM_NAME}

@@ -11,7 +11,7 @@ ApplicationWindow {
   visible: true
   width: 1280
   height: 800
-  title: qsTr("Hello World")
+  title: qsTr("Qt GUI with VTK Point Cloud View")
 
   menuBar: MenuBar {
     Menu {
@@ -58,6 +58,34 @@ ApplicationWindow {
           pcview.parallelProjection = checked
         }
       }
+
+      Text {
+        text: "Point Size:"
+        font.bold: true
+        Layout.leftMargin: 20
+      }
+
+      SpinBox{
+
+          property real factor: Math.pow(10, 1)
+          id: spinbox
+          stepSize: 1
+          value: 10
+          to : 50
+          from : 1
+          validator: DoubleValidator {
+              bottom: Math.min(spinbox.from, spinbox.to)*spinbox.factor
+              top:  Math.max(spinbox.from, spinbox.to)*spinbox.factor
+          }
+
+          textFromValue: function(value, locale) {
+              return parseFloat(value*1.0/factor).toFixed(1);
+          }
+
+          onValueChanged: {
+              pcview.pointSize = value*1.0/factor
+          }
+        }
       
       Text {
         text: "Color Mode:"
@@ -115,6 +143,7 @@ ApplicationWindow {
     anchors.fill: parent
     anchors.margins: 0
     focus: true
+    focusPolicy: Qt.StrongFocus
     colorMode: colorModeCombo.currentValue
     frame: loader.frame
   }

@@ -16,12 +16,18 @@
 
 int main(int argc, char *argv[])
 {
-    QQuickVTKItem::setGraphicsApi();
+    qputenv("QSG_RENDER_LOOP", "basic");
+    qputenv("QSG_NO_VSYNC", "1");
 
-    vtkSMPTools::SetBackend("sequential");
+    QSurfaceFormat fmt = QVTKRenderWindowAdapter::defaultFormat(false);
+    // By default QtQuick sets the alpha buffer size to 0. We follow the same thing here to prevent a
+    // transparent background.
+    fmt.setAlphaBufferSize(0);
+    QSurfaceFormat::setDefaultFormat(fmt);
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGLRhi);
+
+    vtkSMPTools::SetBackend("STDthread");
     vtkSMPTools::Initialize();
-
-    qDebug() << "Using VTK SMP backend:" << vtkSMPTools::GetBackend();
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);

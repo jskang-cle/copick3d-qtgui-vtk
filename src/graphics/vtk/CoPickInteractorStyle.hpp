@@ -1,9 +1,11 @@
 #pragma once
 
 #include "vtkInteractorStyle.h"
+#include "vtkSmartPointer.h"
 
 // Forward declarations
 class vtkCameraInterpolator;
+class vtkActor;
 
 class CoPickInteractorStyle : public vtkInteractorStyle
 {
@@ -55,4 +57,8 @@ protected:
 private:
     CoPickInteractorStyle(const CoPickInteractorStyle&) = delete;
     void operator=(const CoPickInteractorStyle&) = delete;
+
+    bool GetPickedPoint(double pickedPos[3]);
+
+    vtkNew<vtkActor> PointHighlightActor;
 };

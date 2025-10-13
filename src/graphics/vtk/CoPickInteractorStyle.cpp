@@ -14,6 +14,9 @@
 #include "vtkRenderWindowInteractor.h"
 #include "vtkRenderer.h"
 #include "vtkSphereSource.h"
+#include "vtkCursor3D.h"
+#include "vtkProperty.h"
+#include "vtkRendererCollection.h"
 
 #include "vtkLogger.h"
 
@@ -22,6 +25,24 @@ vtkStandardNewMacro(CoPickInteractorStyle);
 CoPickInteractorStyle::CoPickInteractorStyle()
 {
     this->MotionFactor = 10.0;
+    
+    vtkNew<vtkCursor3D> cross;
+    cross->AllOff();
+    cross->AxesOn();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(cross->GetOutputPort());
+    // Disabling it gives better results when zooming close
+    // to the picked actor in the scene
+    mapper->SetResolveCoincidentTopologyToOff();
+    mapper->Update();
+
+    double CURSOR_COLOR[3] = {1.0, 1.0, 1.0};
+    double CROSS_LINE_WIDTH = 3.0;
+
+    this->PointHighlightActor->SetMapper(mapper);
+    this->PointHighlightActor->GetProperty()->SetColor(CURSOR_COLOR);
+    this->PointHighlightActor->GetProperty()->SetLineWidth(CROSS_LINE_WIDTH);
 }
 
 CoPickInteractorStyle::~CoPickInteractorStyle() = default;
@@ -36,6 +57,21 @@ void CoPickInteractorStyle::OnMouseMove()
 {
     int x = this->Interactor->GetEventPosition()[0];
     int y = this->Interactor->GetEventPosition()[1];
+
+    
+    vtkRenderWindowInteractor *rwi = this->Interactor;
+    int shift = rwi->GetShiftKey();
+
+    if (shift)
+    {
+        double cursorPos[3];
+        if (this->GetPickedPoint(cursorPos))
+        {
+            this->PointHighlightActor->SetPosition(cursorPos);
+            this->PointHighlightActor->SetVisibility(true);
+            this->Interactor->GetRenderWindow()->GetRenderers()->GetFirstRenderer()->AddActor(this->PointHighlightActor);
+        }
+    }
 
     switch (this->State)
     {
@@ -373,10 +409,10 @@ void CoPickInteractorStyle::OnChar()
     {
     case 'F':
         this->FlyToPickedPosition();
-        break;
+        return;
     case 'R':
         this->ResetToHomePosition();
-        break;
+        return;
     }
 
     this->Superclass::OnChar();
@@ -390,50 +426,42 @@ void CoPickInteractorStyle::FlyToPickedPosition()
         return;
     }
     
-    vtkRenderWindowInteractor *rwi = this->Interactor;
-
-    this->AnimState = VTKIS_ANIM_ON;
-    vtkAssemblyPath* path = nullptr;
-    this->FindPokedRenderer(rwi->GetEventPosition()[0], rwi->GetEventPosition()[1]);
-    rwi->GetPicker()->Pick(
-        rwi->GetEventPosition()[0], rwi->GetEventPosition()[1], 
-        0.0, this->CurrentRenderer);
-    vtkAbstractPropPicker* picker;
-    if ((picker = vtkAbstractPropPicker::SafeDownCast(rwi->GetPicker())))
+    double pickedPos[3];
+    if (!this->GetPickedPoint(pickedPos))
     {
-        path = picker->GetPath();
+        vtkLog(WARNING, "No point picked, cannot fly to position.");
+        return;
     }
-    if (path != nullptr)
+
+    double focFrom[3], *focTo, flyDiff[3], posFrom[3], posTo[3], viewUp[3];
+    int flyFrames = this->Interactor->GetNumberOfFlyFrames();
+    focTo = pickedPos;
+
+    auto cam = this->CurrentRenderer->GetActiveCamera();
+    cam->GetPosition(posFrom);
+    cam->GetFocalPoint(focFrom);
+    cam->GetViewUp(viewUp);
+
+    vtkMath::Subtract(focTo, focFrom, flyDiff);
+    double distance = vtkMath::Norm(flyDiff);
+
+    vtkLog(INFO, "Flying to picked position: " 
+        << focTo[0] << ", " << focTo[1] << ", " << focTo[2]
+        << " from " 
+        << focFrom[0] << ", " << focFrom[1] << ", " << focFrom[2]
+        << " viewUp: " << viewUp[0] << ", " << viewUp[1] << ", " << viewUp[2]
+        << " distance: " << distance
+        );
+
+    for (int i = 0; i < 3; ++i)
     {
-        double focFrom[3], focTo[3], flyDiff[3], posFrom[3], posTo[3], viewUp[3];
-        int flyFrames = this->Interactor->GetNumberOfFlyFrames();
-
-        auto cam = this->CurrentRenderer->GetActiveCamera();
-        cam->GetPosition(posFrom);
-        cam->GetFocalPoint(focFrom);
-        cam->GetViewUp(viewUp);
-
-        picker->GetPickPosition(focTo);
-        vtkMath::Subtract(focTo, focFrom, flyDiff);
-        double distance = vtkMath::Norm(flyDiff);
-
-        vtkLog(INFO, "Flying to picked position: " 
-            << focTo[0] << ", " << focTo[1] << ", " << focTo[2]
-            << " from " 
-            << focFrom[0] << ", " << focFrom[1] << ", " << focFrom[2]
-            << " viewUp: " << viewUp[0] << ", " << viewUp[1] << ", " << viewUp[2]
-            << " distance: " << distance
-            );
-
-        for (int i = 0; i < 3; ++i)
-        {
-            posTo[i] = posFrom[i] + flyDiff[i];
-        }
-        cam->SetPosition(posTo);
-        cam->SetFocalPoint(focTo);
-        cam->SetViewUp(0, -1, 0);
-        // this->CurrentRenderer->ResetCameraClippingRange();
+        posTo[i] = posFrom[i] + flyDiff[i];
     }
+
+    // cam->SetPosition(posTo);
+    cam->SetFocalPoint(focTo);
+    // cam->SetViewUp(0, -1, 0);
+    // this->CurrentRenderer->ResetCameraClippingRange();
     this->AnimState = VTKIS_ANIM_OFF;
 }
 
@@ -451,4 +479,32 @@ void CoPickInteractorStyle::ResetToHomePosition()
     cam->SetViewUp(this->HomeUp);
     this->CurrentRenderer->ResetCamera();
     rwi->Render();
+}
+
+bool CoPickInteractorStyle::GetPickedPoint(double pickedPos[3])
+{
+    // if (this->CurrentRenderer == nullptr)
+    // {
+    //     // vtkWarningMacro(<< "no current renderer on the interactor style.");
+    //     return false;
+    // }
+
+    vtkRenderWindowInteractor *rwi = this->Interactor;
+    int x = rwi->GetEventPosition()[0];
+    int y = rwi->GetEventPosition()[1];
+
+    vtkAbstractPropPicker *picker = vtkAbstractPropPicker::SafeDownCast(rwi->GetPicker());
+    if (!picker)
+    {
+        vtkWarningMacro(<< "no picker set on the interactor.");
+        return false;
+    }
+
+    if (picker->Pick(x, y, 0.0, this->CurrentRenderer) == 0)
+    {
+        return false;
+    }
+
+    picker->GetPickPosition(pickedPos);
+    return true;
 }
