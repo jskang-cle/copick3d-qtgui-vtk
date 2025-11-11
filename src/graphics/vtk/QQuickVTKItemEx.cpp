@@ -70,7 +70,7 @@ void QQuickVTKItemEx::setGraphicsApi()
 
 //-------------------------------------------------------------------------------------------------
 
-class QSGVtkObjectNode;
+class QSGVtkObjectNodeEx;
 
 class QQuickVTKItemExPrivate
 {
@@ -85,7 +85,7 @@ public:
   QQuickVTKInteractorAdapter qt2vtkInteractorAdapter;
   bool scheduleRender = false;
 
-  mutable QSGVtkObjectNode* node = nullptr;
+  mutable QSGVtkObjectNodeEx* node = nullptr;
 
 private:
   Q_DISABLE_COPY(QQuickVTKItemExPrivate)
@@ -162,20 +162,20 @@ public:
 
 vtkStandardNewMacro(vtkTimerCallback);
 
-class QSGVtkObjectNode
+class QSGVtkObjectNodeEx
   : public QSGTextureProvider
   , public QSGSimpleTextureNode
 {
   Q_OBJECT
 public:
-  QSGVtkObjectNode() { qsgnode_set_description(this, QStringLiteral("vtknode")); }
+  QSGVtkObjectNodeEx() { qsgnode_set_description(this, QStringLiteral("vtknode")); }
 
-  ~QSGVtkObjectNode() override
+  ~QSGVtkObjectNodeEx() override
   {
     if (m_item)
       m_item->destroyingVTK(vtkWindow, vtkUserData);
 
-    delete QSGVtkObjectNode::texture();
+    delete QSGVtkObjectNodeEx::texture();
 
     // Cleanup the VTK window resources
     vtkWindow->GetRenderers()->InitTraversal();
@@ -309,7 +309,7 @@ protected:
 
 QSGNode* QQuickVTKItemEx::updatePaintNode(QSGNode* node, UpdatePaintNodeData*)
 {
-  auto* n = static_cast<QSGVtkObjectNode*>(node);
+  auto* n = static_cast<QSGVtkObjectNodeEx*>(node);
 
   // Don't create the node if our size is invalid
   if (!n && (width() <= 0 || height() <= 0))
@@ -323,7 +323,7 @@ QSGNode* QQuickVTKItemEx::updatePaintNode(QSGNode* node, UpdatePaintNodeData*)
     if (!checkGraphicsApi(window()))
       return nullptr;
     if (!d->node)
-      d->node = new QSGVtkObjectNode;
+      d->node = new QSGVtkObjectNodeEx;
     n = d->node;
   }
 
@@ -333,8 +333,8 @@ QSGNode* QQuickVTKItemEx::updatePaintNode(QSGNode* node, UpdatePaintNodeData*)
     n->initialize(this);
     n->m_window = window();
     n->m_item = this;
-    connect(window(), &QQuickWindow::beforeRendering, n, &QSGVtkObjectNode::render);
-    connect(window(), &QQuickWindow::screenChanged, n, &QSGVtkObjectNode::handleScreenChange);
+    connect(window(), &QQuickWindow::beforeRendering, n, &QSGVtkObjectNodeEx::render);
+    connect(window(), &QQuickWindow::screenChanged, n, &QSGVtkObjectNodeEx::handleScreenChange);
   }
 
   // Watch for size changes
@@ -431,7 +431,7 @@ QSGTextureProvider* QQuickVTKItemEx::textureProvider() const
   Q_D(const QQuickVTKItemEx);
 
   if (!d->node)
-    d->node = new QSGVtkObjectNode;
+    d->node = new QSGVtkObjectNodeEx;
 
   return d->node;
 }

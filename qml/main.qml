@@ -2,7 +2,7 @@ import QtQuick 6.0
 import QtQuick.Window 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
-import QtQuick.Dialogs 6.2
+import QtQuick.Dialogs 6.4
 
 import copick3d.qtgui.graphics 1.0
 
@@ -12,6 +12,8 @@ ApplicationWindow {
   width: 1280
   height: 800
   title: qsTr("Qt GUI with VTK Point Cloud View")
+
+  Keys.forwardTo: pcview
 
   menuBar: MenuBar {
     Menu {
@@ -46,9 +48,35 @@ ApplicationWindow {
     id: toolbar
     width: parent.width
 
+    Keys.forwardTo: pcview
+
     RowLayout {
       anchors.fill: parent
       anchors.margins: 5
+
+      Rectangle {
+        width: 20
+        height: 20
+        color: pcview.backgroundColor
+        border.color: "black"
+        border.width: 1
+        radius: 3
+        Layout.leftMargin: 10
+      }
+
+      Button {
+        text: "Pick Color"
+        onClicked: colorDialog.open()
+      }
+
+      CheckBox {
+        id: fixedPointSizeCheck
+        text: "Fixed Point Size"
+        checked: false
+        onCheckedChanged: {
+          pcview.fixedPointSize = checked
+        }
+      }
 
       CheckBox {
         id: parallelProjectionCheck
@@ -59,33 +87,41 @@ ApplicationWindow {
         }
       }
 
+      CheckBox {
+        id: axisGridCheck
+        text: "Show Axis/Grid"
+        checked: pcview.axisGridVisible
+        onCheckedChanged: {
+          pcview.axisGridVisible = checked
+        }
+      }
+
       Text {
         text: "Point Size:"
         font.bold: true
         Layout.leftMargin: 20
       }
 
-      SpinBox{
-
-          property real factor: Math.pow(10, 1)
-          id: spinbox
-          stepSize: 1
-          value: 10
-          to : 50
-          from : 1
-          validator: DoubleValidator {
-              bottom: Math.min(spinbox.from, spinbox.to)*spinbox.factor
-              top:  Math.max(spinbox.from, spinbox.to)*spinbox.factor
-          }
-
-          textFromValue: function(value, locale) {
-              return parseFloat(value*1.0/factor).toFixed(1);
-          }
-
-          onValueChanged: {
-              pcview.pointSize = value*1.0/factor
-          }
+      SpinBox {
+        property real factor: Math.pow(10, 1)
+        id: spinbox
+        stepSize: 1
+        value: 10
+        to : 50
+        from : 1
+        validator: DoubleValidator {
+            bottom: Math.min(spinbox.from, spinbox.to)*spinbox.factor
+            top:  Math.max(spinbox.from, spinbox.to)*spinbox.factor
         }
+
+        textFromValue: function(value, locale) {
+            return parseFloat(value*1.0/factor).toFixed(1);
+        }
+
+        onValueChanged: {
+            pcview.pointSize = value*1.0/factor
+        }
+      }
       
       Text {
         text: "Color Mode:"
@@ -133,6 +169,18 @@ ApplicationWindow {
     }
   }
 
+  ColorDialog {
+    id: colorDialog
+    title: "Select a Color"
+    selectedColor: pcview.backgroundColor
+    onAccepted: {
+      pcview.backgroundColor = colorDialog.selectedColor // Update rectangle color on acceptance
+    }
+    onRejected: {
+      console.log("Color selection cancelled.")
+    }
+  }
+
   PointCloudLoader {
     id: loader
     filePath: "D:\\data\\copick_images\\binpicking\\multiple_IMG_Texture_8Bit.png"
@@ -146,5 +194,18 @@ ApplicationWindow {
     focusPolicy: Qt.StrongFocus
     colorMode: colorModeCombo.currentValue
     frame: loader.frame
+  }
+
+  Text {
+    id: pickedPointText
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.margins: 10
+    color: "white"
+    font.pixelSize: 14
+    text: {
+      let p = pcview.pickedPoint
+      return `Picked Point: (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`
+    }
   }
 }

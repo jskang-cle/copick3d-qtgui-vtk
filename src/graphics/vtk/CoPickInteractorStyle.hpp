@@ -1,11 +1,18 @@
 #pragma once
 
-#include "vtkInteractorStyle.h"
-#include "vtkSmartPointer.h"
+#include <vtkInteractorStyle.h>
+#include <vtkSmartPointer.h>
+#include <vtkVector.h>
+
+#include "LineActor.hpp"
 
 // Forward declarations
 class vtkCameraInterpolator;
 class vtkActor;
+
+class vtkAxisActor;
+class vtkAxisActor2D;
+class vtkCaptionActor2D;
 
 class CoPickInteractorStyle : public vtkInteractorStyle
 {
@@ -13,6 +20,12 @@ public:
     static CoPickInteractorStyle* New();
     vtkTypeMacro(CoPickInteractorStyle, vtkInteractorStyle);
     void PrintSelf(ostream& os, vtkIndent indent) override;
+
+    enum CoPickInteractorEvent
+    {
+        PointPicked = 10000,
+        PointHovered = 10001,
+    };
 
     ///@{
     /**
@@ -61,4 +74,16 @@ private:
     bool GetPickedPoint(double pickedPos[3]);
 
     vtkNew<vtkActor> PointHighlightActor;
+
+    vtkNew<vtkActor> P1Actor;
+    vtkNew<vtkActor> P2Actor;
+    vtkNew<vtkCaptionActor2D> P1LabelActor;
+    vtkNew<vtkCaptionActor2D> P2LabelActor;
+
+    vtkNew<LineActor> DistanceLineActor;
+    vtkNew<vtkCaptionActor2D> DistanceLabelActor;
+
+    float HoveredPoint[3] = {0.0f, 0.0f, 0.0f};
+    float PreviousClickedPoint[3] = {0.0f, 0.0f, 0.0f};
+    float CurrentClickedPoint[3] = {0.0f, 0.0f, 0.0f};
 };

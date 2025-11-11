@@ -1,5 +1,8 @@
 #include <vtkSMPTools.h>
 #include <vtkLogger.h>
+#include <vtkFileOutputWindow.h>
+#include <vtkOutputWindow.h>
+#include <vtkSmartPointer.h>
 
 #include <QtQml/QQmlApplicationEngine>
 
@@ -17,7 +20,12 @@
 int main(int argc, char *argv[])
 {
     qputenv("QSG_RENDER_LOOP", "basic");
-    qputenv("QSG_NO_VSYNC", "1");
+    // qputenv("QSG_NO_VSYNC", "1");
+
+    vtkSmartPointer<vtkFileOutputWindow> fileOutputWindow =
+        vtkSmartPointer<vtkFileOutputWindow>::New();
+    fileOutputWindow->SetFileName("vtk_log.txt");
+    vtkOutputWindow::SetInstance(fileOutputWindow);
 
     QSurfaceFormat fmt = QVTKRenderWindowAdapter::defaultFormat(false);
     // By default QtQuick sets the alpha buffer size to 0. We follow the same thing here to prevent a

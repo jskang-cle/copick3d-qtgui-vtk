@@ -5,7 +5,6 @@
 #include "qdebug.h"
 
 #include <vtkObjectFactory.h>
-
 #include <vtkFloatArray.h>
 #include <vtkPoints.h>
 #include <vtkPointData.h>
@@ -20,9 +19,8 @@
 #include <vtkElevationFilter.h>
 #include <vtkVertexGlyphFilter.h>
 #include <vtkStatisticalOutlierRemoval.h>
-
+#include <vtkStaticPointLocator.h>
 #include <vtkArrayDispatch.h>
-
 #include <vtkProperty.h>
 #include <vtkShaderProperty.h>
 #include <vtkUniforms.h>
@@ -32,6 +30,7 @@
 #include <vtkCamera.h>
 
 #include "vtk/DepthFilter.hpp"
+#include "vtk/PointCloudMapper.hpp"
 
 namespace copick3d::qtgui::graphics
 {
@@ -81,12 +80,12 @@ void PointCloudActor::InitializePipeline()
 
     this->PolyDataProducer->SetOutput(this->PolyData);
     
-#if defined(DEBUG) || defined(_DEBUG)
+#if 0 // defined(DEBUG) || defined(_DEBUG)
     this->DepthFilter->SetInputConnection(this->PolyDataProducer->GetOutputPort());
 #else
     this->SORFilter->SetInputConnection(this->PolyDataProducer->GetOutputPort());
-    this->SORFilter->SetSampleSize(25);
-    this->SORFilter->SetStandardDeviationFactor(1.0);
+    this->SORFilter->SetSampleSize(50);
+    this->SORFilter->SetStandardDeviationFactor(0.5);
     this->DepthFilter->SetInputConnection(this->SORFilter->GetOutputPort());
 #endif
 
@@ -118,9 +117,6 @@ void PointCloudActor::InitializePipeline()
     this->RectSource->SetPoint1(0.0, 0.5, -0.5);
     this->RectSource->SetPoint2(0.0, -0.5, 0.5);
 
-    this->ArrowSource->SetTipResolution(2);
-    this->ArrowSource->SetShaftResolution(1);
-
     this->Glyph3DMapper->SetInputConnection(this->DepthFilter->GetOutputPort());
     this->Glyph3DMapper->SetSourceConnection(this->RectSource->GetOutputPort());
     this->Glyph3DMapper->SetOrientationMode(vtkGlyph3DMapper::DIRECTION);
@@ -138,42 +134,29 @@ void PointCloudActor::UpdatePipeline()
     vtkMapper* mapper;
     mapper = this->Glyph3DMapper;
 
-    if (this->RenderType == POINT_RENDER_TYPE_VERTEX)
+    if (this->FixedPointSize)
     {
         mapper = this->VertexGlyphMapper;
-        this->VertexGlyphMapper->SetUseProgramPointSize(false);
-        this->GetProperty()->SetPointSize(this->PointSize);
-        qDebug() << "PointCloudActor::UpdatePipeline(): Set point size =" << this->PointSize;
+        this->VertexGlyphMapper->SetUseProgramPointSize(true);
+        // this->GetProperty()->SetPointSize(this->PointSize);
         
-        // shaderProp->AddVertexShaderReplacement(
-        //     "//VTK::ValuePass::Impl",  // replace the normal block
-        //     true,                      // before the standard replacements
-        //     "gl_PointSize = clamp(500.0 / gl_Position.w, 1.0, 500.0);\n"
-        //     "///VTK::ValuePass::Impl\n", // we still want the default
-        //     false                        // only do it once
-        // );
+        shaderProp->AddVertexShaderReplacement(
+            "//VTK::ValuePass::Impl",  // replace the normal block
+            true,                      // before the standard replacements
+            std::string("gl_PointSize = ") + std::to_string(this->PointSize) + "; \n" +
+            "///VTK::ValuePass::Impl\n", // we still want the default
+            false                        // only do it once
+        );
     }
     else
     {
-        double pointScaleUniform = 1.0;
-        if (this->RenderType == POINT_RENDER_TYPE_SQUARE)
-        {
-            this->Glyph3DMapper->SetSourceConnection(this->RectSource->GetOutputPort());
+        this->Glyph3DMapper->SetSourceConnection(this->RectSource->GetOutputPort());
 
-            // this->Glyph3DMapper->SetScaleFactor(this->PointSize * this->PointScale); 
-            /// this rebuilds entire VBO every time which is very slow
-            /// so we use a uniform to scale in the vertex shader instead
+        // this->Glyph3DMapper->SetScaleFactor(this->PointSize * this->PointScale); 
+        /// this rebuilds entire VBO every time which is very slow
+        /// so we use a uniform to scale in the vertex shader instead
 
-            pointScaleUniform = this->PointSize * this->PointScale;
-        }
-        else if (this->RenderType == POINT_RENDER_TYPE_ARROW)
-        {
-            this->Glyph3DMapper->SetSourceConnection(this->ArrowSource->GetOutputPort());
-
-            // this->Glyph3DMapper->SetScaleFactor(this->PointSize * this->PointScale * 2.0);
-
-            pointScaleUniform = this->PointSize * this->PointScale * 2.0;
-        }
+        double pointScaleUniform = this->PointSize * this->PointScale;
 
         shaderProp->AddVertexShaderReplacement(
             "//VTK::Normal::Dec",  // replace the normal block
@@ -203,24 +186,24 @@ void PointCloudActor::UpdatePipeline()
         
         this->GetProperty()->SetLighting(false);
 
-        if (this->RenderType == POINT_RENDER_TYPE_VERTEX)
-        {
-            shaderProp->AddVertexShaderReplacement(
-                "= scalarColor", // replace the color implementation block
-                false,                 // after the standard replacements
-                "= vec4(scalarColor.bgr, 1.0)",
-                false // only do it once
-            );
-        }
-        else
-        {
-            shaderProp->AddVertexShaderReplacement(
-                "=  glyphColor;", // replace the color implementation block
-                false,                 // after the standard replacements
-                "=  vec4(glyphColor.bgr, 1.0);",
-                false // only do it once
-            );
-        }
+        // if (this->FixedPointSize)
+        // {
+        //     shaderProp->AddVertexShaderReplacement(
+        //         "= scalarColor", // replace the color implementation block
+        //         false,                 // after the standard replacements
+        //         "= vec4(scalarColor.bgr, 1.0)",
+        //         false // only do it once
+        //     );
+        // }
+        // else
+        // {
+        //     shaderProp->AddVertexShaderReplacement(
+        //         "=  glyphColor;", // replace the color implementation block
+        //         false,                 // after the standard replacements
+        //         "=  vec4(glyphColor.bgr, 1.0);",
+        //         false // only do it once
+        //     );
+        // }
     }
     else if (this->ColorMode == POINT_COLOR_MODE_NORMAL)
     {
@@ -230,7 +213,7 @@ void PointCloudActor::UpdatePipeline()
         // disable default scalar coloring
         mapper->SetScalarVisibility(0);
 
-        if (this->RenderType == POINT_RENDER_TYPE_VERTEX)
+        if (this->FixedPointSize)
         {
             // add color output variable
             shaderProp->AddVertexShaderReplacement(
@@ -243,7 +226,7 @@ void PointCloudActor::UpdatePipeline()
             shaderProp->AddVertexShaderReplacement(
                 "//VTK::Color::Impl", // replace the color implementation block
                 true,                 // before the standard replacements
-                "vertexColorVSOutput = vec4(normalMC.xyz * 0.5 + 0.5, 1.0);",
+                "vertexColorVSOutput = vec4(vec3(normalMC.x, -normalMC.y, -normalMC.z) * 0.5 + 0.5, 1.0);",
                 false // only do it once
             );
             // use the color calculated in vertex shader in fragment shader
@@ -267,7 +250,7 @@ void PointCloudActor::UpdatePipeline()
             shaderProp->AddVertexShaderReplacement(
                 "=  glyphColor;", // replace the color implementation block
                 false,                 // after the standard replacements
-                "=  vec4(normalize(vec3(glyphNormalMatrix[0])) * 0.5 + 0.5, 1.0);",
+                "=  vec4(normalize(vec3(glyphNormalMatrix[0]).rgb) * vec3(1, -1, -1) * 0.5 + 0.5, 1.0);",
                 false // only do it once
             );
             
@@ -353,9 +336,6 @@ void PointCloudActor::SetFrame(QSharedPointer<copick3d::Frame> frame)
     this->Positions->Modified();
     this->Normals->Modified();
     this->Colors->Modified();
-
-    this->PolyData->GetPointData()->SetActiveNormals("Normals");
-    this->PolyData->GetPointData()->SetActiveScalars("Colors");
 
     if (this->FramePtr)
     {

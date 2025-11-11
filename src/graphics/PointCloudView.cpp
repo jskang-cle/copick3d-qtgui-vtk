@@ -18,6 +18,7 @@
 #include <vtkSphereSource.h>
 
 #include <vtkPoints.h>
+#include <vtkCellArray.h>
 #include <vtkDataArray.h>
 #include <vtkFloatArray.h>
 #include <vtkArrayCalculator.h>
@@ -45,7 +46,10 @@
 #include "vtk/PointPickerUsingLocator.hpp"
 #include "vtk/vtkCameraOrientationWidgetEx.hpp"
 
+#include "vtkCallbackCommand.h"
+
 #include "PointCloudActor.hpp"
+#include "vtk/LineActor.hpp"
 
 namespace copick3d::qtgui::graphics
 {
@@ -60,10 +64,8 @@ struct PointCloudViewData : vtkObject
     vtkNew<vtkRenderer> renderer;
 
     vtkNew<vtkCameraOrientationWidgetEx> cameraWidget;
-    vtkObject* orientationWidget;
 
     vtkNew<PointCloudActor> actor;
-
     vtkNew<vtkCubeAxesActor> cubeAxesActor;
 };
 
@@ -74,10 +76,23 @@ PointCloudView::PointCloudView(QQuickItem *parent)
 {
 }
 
+vtkSmartPointer<vtkPoints> GetPtOfCircle(int numOfPts, double radius, double* center)
+{
+	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+	for (unsigned int i = 0; i < numOfPts; i++)
+	{
+		const double angle = 2.0 * vtkMath::Pi() * (double)i / (double)numOfPts;
+		points->InsertPoint((vtkIdType)i, radius*cos(angle)+center[0], radius*sin(angle)+center[1], 0+center[2]);
+	}
+	return points;
+}
+
 QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *renderWindow)
 {
-    vtkNew<PointCloudViewData> data;
-    data->renderer->SetBackground(0.1, 0.1, 0.1);
+    PointCloudViewData* data = PointCloudViewData::New();
+    data->renderer->SetBackground(this->m_backgroundColor.redF(),
+                                  this->m_backgroundColor.greenF(),
+                                  this->m_backgroundColor.blueF());
 
     renderWindow->AddRenderer(data->renderer);
     renderWindow->SetMultiSamples(8);
@@ -86,6 +101,22 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     vtkNew<CoPickInteractorStyle> style;
     style->SetDefaultRenderer(data->renderer);
     renderWindow->GetInteractor()->SetInteractorStyle(style);
+
+    vtkCallbackCommand* hoveredCommand = vtkCallbackCommand::New();
+    hoveredCommand->SetClientData(this);
+    hoveredCommand->SetCallback([](vtkObject* caller, unsigned long, void* clientdata, void* calldata)
+    {
+        double* pos = static_cast<double*>(calldata);
+        QVector3D pickedPoint(static_cast<float>(pos[0]),
+                              static_cast<float>(pos[1]),
+                              static_cast<float>(pos[2]));
+
+        auto item = static_cast<PointCloudView*>(clientdata);
+        item->m_pickedPoint = pickedPoint;
+        Q_EMIT item->pickedPointChanged(pickedPoint);
+    });
+
+    style->AddObserver(CoPickInteractorStyle::PointHovered, hoveredCommand);
 
     data->renderer->AddActor(data->actor);
 
@@ -97,26 +128,12 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     data->cubeAxesActor->DrawZGridlinesOn();
     data->cubeAxesActor->PickableOff();
 
-    // data->renderer->AddActor(data->cubeAxesActor);
-
-    // data->renderer->ResetCamera();
-
-    // auto rep = vtkSmartPointer<vtkAxesActor>::New();
-    // data->orientationWidget->SetOrientationMarker(rep);
-    // data->orientationWidget->SetInteractor(renderWindow->GetInteractor());
-    // data->orientationWidget->SetEnabled(1);
-    // data->orientationWidget->InteractiveOff();
-
-    auto orientationWidget = vtkOrientationMarkerWidget::New();
-    orientationWidget->SetOrientationMarker(vtkSmartPointer<vtkAxesActor>::New());
-    orientationWidget->SetInteractor(renderWindow->GetInteractor());
-    orientationWidget->SetEnabled(1);
-    orientationWidget->InteractiveOff();
-    data->orientationWidget = orientationWidget;
+    data->renderer->AddActor(data->cubeAxesActor);
 
     data->cameraWidget->SetParentRenderer(data->renderer);
     data->cameraWidget->SetInteractor(renderWindow->GetInteractor());
     data->cameraWidget->SetEnabled(1);
+    data->cameraWidget->GetDefaultRenderer()->GetActiveCamera()->ParallelProjectionOn();
     // data->cameraWidget->AnimateOff();
     // data->cameraWidget->SetProcessEvents(false);
 
@@ -126,101 +143,79 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     cam->SetFocalPoint(0, 0, 1000);
     cam->SetClippingRange(1.0, 2000.0);
 
+    renderWindow->GetInteractor()->LightFollowCameraOff();
+    // data->renderer->LightFollowCameraOff();
+
     vtkNew<PointPickerUsingLocator> picker;
     // picker->SetSnapToMeshPoint(true);
     renderWindow->GetInteractor()->SetPicker(picker);
 
-    // // add sphere actor for testing
-    // vtkNew<vtkSphereSource> sphere;
-    // sphere->SetCenter(0.0, 0.0, 0.0);
-    // sphere->SetRadius(5.0);
-    // sphere->SetThetaResolution(32);
-    // sphere->SetPhiResolution(32);
+    vtkNew<vtkCallbackCommand> objectModifiedCallback;
+    objectModifiedCallback->SetClientData(data);
+    objectModifiedCallback->SetCallback([](vtkObject* caller, unsigned long, void* clientdata, void*)
+    {
+        auto data = static_cast<PointCloudViewData*>(clientdata);
+        if (!data)
+            return;
+        data->cubeAxesActor->SetBounds(data->actor->GetBounds());
+        data->renderer->ResetCameraClippingRange();
+    });
 
-    // vtkNew<vtkPolyDataMapper> sphereMapper;
-    // sphereMapper->SetInputConnection(sphere->GetOutputPort());
-    // vtkNew<vtkActor> sphereActor;
-    // sphereActor->SetMapper(sphereMapper);
-
-    // data->renderer->AddActor(sphereActor);
+    data->actor->AddObserver(vtkCommand::ModifiedEvent, objectModifiedCallback);
 
     return data;
 }
 
-void PointCloudView::setFrame(QSharedPointer<copick3d::Frame> frame)
-{
-    if (frame == m_frame)
-        return;
+/// Macro to define property setter then apply the change in the render thread using dispatch_async.
+#define SET_WITH_DISPATCH(method, type, member, value, signal, dispatchCode) \
+    void PointCloudView::method(type value) \
+    { \
+        if (value == member) \
+            return; \
+        member = value; \
+        Q_EMIT signal(value); \
+        dispatch_async([value](vtkRenderWindow* renderWindow, vtkUserData userData) \
+        { \
+            auto data = PointCloudViewData::SafeDownCast(userData); \
+            if (!data) \
+                return; \
+            dispatchCode \
+        }); \
+    }
 
-    m_frame = frame;
-    Q_EMIT frameChanged(frame);
+SET_WITH_DISPATCH(setFrame, QSharedPointer<copick3d::Frame>, m_frame, frame, frameChanged,
+    data->actor->SetFrame(frame);
 
-    dispatch_async([frame](vtkRenderWindow* renderWindow, vtkUserData userData)
-    {
-        auto data = PointCloudViewData::SafeDownCast(userData);
-        if (!data)
-            return;
+    data->renderer->ResetCameraClippingRange();
+    data->renderer->ResetCamera();
+)
 
-        data->actor->SetFrame(frame);
-        data->cubeAxesActor->SetBounds(data->actor->GetBounds());
+SET_WITH_DISPATCH(setParallelProjection, bool, m_parallelProjection, enable, parallelProjectionChanged,
+    data->renderer->GetActiveCamera()->SetParallelProjection(enable);
+)
 
-        data->renderer->ResetCameraClippingRange();
-        data->renderer->ResetCamera();
-    });
-}
+SET_WITH_DISPATCH(setFixedPointSize, bool, m_fixedPointSize, enable, fixedPointSizeChanged,
+    PointCloudActor* actor = data->actor;
+    actor->SetFixedPointSize(enable);
+)
 
-void PointCloudView::setParallelProjection(bool enable)
-{
-    if (enable == m_parallelProjection)
-        return;
+SET_WITH_DISPATCH(setColorMode, PointCloudColorMode, m_colorMode, mode, colorModeChanged,
+    PointCloudActor* actor = data->actor;
+    actor->SetColorMode(static_cast<PointCloudActor::PointColorMode>(mode));
+)
 
-    m_parallelProjection = enable;
-    Q_EMIT parallelProjectionChanged(enable);
+SET_WITH_DISPATCH(setPointSize, float, m_pointSize, size, pointSizeChanged,
+    PointCloudActor* actor = data->actor;
+    actor->SetPointSize(static_cast<double>(size));
+);
 
-    dispatch_async([enable](vtkRenderWindow* renderWindow, vtkUserData userData)
-    {
-        auto data = PointCloudViewData::SafeDownCast(userData);
-        if (!data)
-            return;
+SET_WITH_DISPATCH(setBackgroundColor, const QColor, m_backgroundColor, color, backgroundColorChanged,
+    data->renderer->SetBackground(color.redF(), color.greenF(), color.blueF());
+)
 
-        data->renderer->GetActiveCamera()->SetParallelProjection(enable);
-    });
-}
+SET_WITH_DISPATCH(setAxisGridVisible, bool, m_axisGridVisible, visible, axisGridVisibleChanged,
+    data->cubeAxesActor->SetVisibility(visible);
+);
 
-void PointCloudView::setColorMode(PointCloudColorMode mode)
-{
-    if (mode == m_colorMode)
-        return;
-    m_colorMode = mode;
-    Q_EMIT colorModeChanged(mode);
-
-    dispatch_async([mode](vtkRenderWindow* renderWindow, vtkUserData userData)
-    {
-        auto data = PointCloudViewData::SafeDownCast(userData);
-        if (!data)
-            return;
-
-        PointCloudActor* actor = data->actor;
-        actor->SetColorMode(static_cast<PointCloudActor::PointColorMode>(mode));
-    });
-}
-
-void PointCloudView::setPointSize(float size)
-{
-    if (size <= 0.0f)
-        return;
-    if (size == m_pointSize)
-        return;
-
-    dispatch_async([size](vtkRenderWindow* renderWindow, vtkUserData userData)
-    {
-        auto data = PointCloudViewData::SafeDownCast(userData);
-        if (!data)
-            return;
-
-        PointCloudActor* actor = data->actor;
-        actor->SetPointSize(static_cast<double>(size));
-    });
-}
 
 } // namespace copick3d::qtgui::graphics

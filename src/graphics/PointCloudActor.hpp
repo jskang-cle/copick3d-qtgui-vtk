@@ -41,15 +41,8 @@ public:
     void SetFrame(QSharedPointer<copick3d::Frame> frame);
     QSharedPointer<copick3d::Frame> GetFrame() const { return this->FramePtr; }
 
-    enum PointRenderType
-    {
-        POINT_RENDER_TYPE_VERTEX = 0,
-        POINT_RENDER_TYPE_SQUARE = 1,
-        POINT_RENDER_TYPE_ARROW = 2,
-    };
-
-    vtkGetMacro(RenderType, int);
-    vtkSetClampMacro(RenderType, int, POINT_RENDER_TYPE_VERTEX, POINT_RENDER_TYPE_ARROW);
+    vtkGetMacro(FixedPointSize, bool);
+    vtkSetMacro(FixedPointSize, bool);
 
     enum PointColorMode
     {
@@ -106,7 +99,6 @@ private:
     vtkNew<vtkOpenGLPolyDataMapper> VertexGlyphMapper;
 
     vtkNew<vtkPlaneSource> RectSource;
-    vtkNew<vtkArrowSource> ArrowSource;
     vtkNew<vtkGlyph3DMapper> Glyph3DMapper;
 
     vtkTimeStamp BuildTime;
@@ -116,7 +108,7 @@ private:
     double PointScale = 1.0;
     double PointSize = 1.0;
 
-    int RenderType = POINT_RENDER_TYPE_SQUARE;
+    bool FixedPointSize = false;
     int ColorMode = POINT_COLOR_MODE_RGB;
     int ColorMap = POINT_COLOR_MAP_JET;
 };

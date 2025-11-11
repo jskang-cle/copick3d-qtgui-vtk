@@ -5,6 +5,7 @@ set(PROGRAM_NAME qtvtk)
 project(${PROGRAM_NAME} VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_AUTOMOC ON)
 set(QT_GENERATE_QMLLS_INI ON)
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install)
 
 find_package(Qt6 REQUIRED 
     COMPONENTS
@@ -23,12 +24,14 @@ find_package(VTK REQUIRED
         InteractionStyle
         RenderingAnnotation
     HINTS
-        "D:/temp/vtk/build"
+        "D:/lib/vtk/"
 )
 
 find_package(copick3d_api REQUIRED
     HINTS "D:/repos/copick3d_api/build/install"
 )
+
+qt_standard_project_setup()
 
 qt_add_executable(${PROGRAM_NAME}
     MANUAL_FINALIZATION
@@ -41,6 +44,13 @@ qt_add_executable(${PROGRAM_NAME}
     src/graphics/vtk/DepthFilter.cpp
     src/graphics/vtk/vtkCameraOrientationWidgetEx.cpp
     src/graphics/vtk/QQuickVTKItemEx.cpp
+    src/graphics/vtk/LineActor.cpp
+)
+
+qt_add_qml_module(${PROGRAM_NAME}
+    URI Application
+    VERSION 1.0
+    QML_FILES qml/main.qml
 )
 
 qt6_add_resources(${PROGRAM_NAME} ${PROGRAM_NAME}
@@ -50,16 +60,12 @@ qt6_add_resources(${PROGRAM_NAME} ${PROGRAM_NAME}
         "qml/main.qml"
 )
 
-# if (VTK_QT_VERSION EQUAL 6)
-#     qt_import_qml_plugins(${PROGRAM_NAME})
-#     qt_finalize_executable(${PROGRAM_NAME})
-# endif()
-
 target_link_libraries(${PROGRAM_NAME} PRIVATE
     copick3d_api::copick3d_api
     Qt6::Core 
     Qt6::Quick 
     ${VTK_LIBRARIES}
+    VTK::FiltersPoints
 )
 
 set_target_properties(${PROGRAM_NAME} PROPERTIES
@@ -73,3 +79,23 @@ add_custom_command(TARGET ${PROGRAM_NAME} POST_BUILD
         $<TARGET_FILE:copick3d_api::copick3d_api>
         $<TARGET_FILE_DIR:${PROGRAM_NAME}>
 )
+
+install(TARGETS ${PROGRAM_NAME}
+    BUNDLE  DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+qt_generate_deploy_qml_app_script(
+    TARGET ${PROGRAM_NAME}
+    OUTPUT_SCRIPT deploy_script
+    NO_UNSUPPORTED_PLATFORM_ERROR
+)
+
+install(SCRIPT ${deploy_script})
+
+if (WIN32)
+    install(FILES
+        $<TARGET_RUNTIME_DLLS:${PROGRAM_NAME}>
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
