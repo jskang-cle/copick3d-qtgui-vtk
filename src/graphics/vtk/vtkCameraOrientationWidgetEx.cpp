@@ -222,7 +222,7 @@ void vtkCameraOrientationWidgetEx::SelectAction(vtkAbstractWidget* w)
   self->EventCallbackCommand->AbortFlagOn();
   self->StartInteraction();
   self->InvokeEvent(vtkCommand::StartInteractionEvent);
-  self->Render();
+  // self->Render();
 }
 
 //----------------------------------------------------------------------------
@@ -290,7 +290,7 @@ void vtkCameraOrientationWidgetEx::EndSelectAction(vtkAbstractWidget* w)
     else
     {
       self->ParentRenderer->ResetCamera();
-      self->Render();
+      // self->Render();
     }
   }
 
@@ -302,7 +302,7 @@ void vtkCameraOrientationWidgetEx::EndSelectAction(vtkAbstractWidget* w)
   self->EventCallbackCommand->AbortFlagOn();
   self->EndInteraction();
   self->InvokeEvent(vtkCommand::EndInteractionEvent);
-  self->Render();
+  // self->Render();
 }
 
 //----------------------------------------------------------------------------
@@ -420,7 +420,7 @@ void vtkCameraOrientationWidgetEx::MoveAction(vtkAbstractWidget* w)
   }
   if (self->WidgetState != WidgetStateType::Inactive)
   {
-    self->Render();
+    // self->Render();
   }
 }
 

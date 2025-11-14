@@ -1,6 +1,7 @@
 #include "DepthFilter.hpp"
 
 #include <vtkArrayDispatch.h>
+#include <vtkCellData.h>
 #include <vtkObjectFactory.h>
 #include <vtkInformation.h>
 #include <vtkInformationVector.h>
@@ -70,33 +71,27 @@ int DepthFilter::RequestData(vtkInformation* vtkNotUsed(request),
     vtkInformation* outInfo = outputVector->GetInformationObject(0);
 
     // get the input and output
-    vtkDataSet* input = vtkDataSet::SafeDownCast(inInfo->Get(vtkDataObject::DATA_OBJECT()));
-    vtkDataSet* output = vtkDataSet::SafeDownCast(outInfo->Get(vtkDataObject::DATA_OBJECT()));
+    vtkDataSet* input = vtkDataSet::SafeDownCast(
+        inInfo->Get(vtkDataObject::DATA_OBJECT()));
+    vtkDataSet* output = vtkDataSet::SafeDownCast(
+        outInfo->Get(vtkDataObject::DATA_OBJECT()));
 
     output->CopyStructure(input);
-    
-    if (input == nullptr || output == nullptr)
+
+    if (input->GetNumberOfPoints() < 1)
     {
-        vtkErrorMacro("Invalid input or output data.");
-        return 0;
+        vtkDebugMacro(<< "No input!");
+        return 1;
     }
 
     vtkPointSet* points = vtkPointSet::SafeDownCast(input);
 
     if (!points)
     {
-        vtkErrorMacro("Input data is not a vtkPointSet.");
-        return 0;
+        return 1;
     }
 
     vtkPoints* inputPoints = points->GetPoints();
-
-    if (!inputPoints)
-    {
-        vtkErrorMacro("Input point set has no points.");
-        return 0;
-    }
-
     vtkDataArray* pointData = inputPoints->GetData();
     vtkIdType numPoints = input->GetNumberOfPoints();
 
@@ -129,8 +124,10 @@ int DepthFilter::RequestData(vtkInformation* vtkNotUsed(request),
     // std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double, std::milli> duration = endTime - startTime;
     // vtkLogF(INFO, "Depth computation took %.3f ms", duration.count());
-    
+
+    // Add the depth array to the output point data
     output->GetPointData()->PassData(input->GetPointData());
+    output->GetCellData()->PassData(input->GetCellData());
     output->GetPointData()->AddArray(depthArray);
 
     return 1;

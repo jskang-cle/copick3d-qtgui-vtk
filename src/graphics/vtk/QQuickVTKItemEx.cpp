@@ -139,29 +139,6 @@ void QQuickVTKItemEx::dispatch_async(std::function<void(vtkRenderWindow*, vtkUse
   update();
 }
 
-class vtkTimerCallback : public vtkCallbackCommand
-{
-public:
-  vtkTimerCallback() = default;
-
-  static vtkTimerCallback* New();
-  vtkTypeMacro(vtkTimerCallback, vtkCallbackCommand);
-
-  virtual void Execute(vtkObject* caller, unsigned long eventId,
-                       void* vtkNotUsed(callData))
-  {
-    if (vtkCommand::TimerEvent == eventId && Item)
-    {
-      QMetaObject::invokeMethod(Item, [=]() { Item->update(); }, Qt::QueuedConnection);
-    }
-  }
-
-public:
-  QQuickVTKItemEx* Item = nullptr;
-};
-
-vtkStandardNewMacro(vtkTimerCallback);
-
 class QSGVtkObjectNodeEx
   : public QSGTextureProvider
   , public QSGSimpleTextureNode
@@ -229,10 +206,6 @@ public:
     vtkWindow->SetForceMaximumHardwareLineWidth(1);
     vtkWindow->SetOwnContext(false);
     vtkWindow->OpenGLInitContext();
-
-    timerCallback = vtkSmartPointer<vtkTimerCallback>::New();
-    timerCallback->Item = item;
-    ia->AddObserver(vtkCommand::TimerEvent, timerCallback);
   }
 
   void scheduleRender()
@@ -295,7 +268,6 @@ public Q_SLOTS: // NOLINT(readability-redundant-access-specifiers)
 private:
   vtkSmartPointer<vtkGenericOpenGLRenderWindow> vtkWindow;
   vtkSmartPointer<vtkObject> vtkUserData;
-  vtkSmartPointer<vtkTimerCallback> timerCallback;
   bool m_renderPending = false;
 
 protected:
@@ -469,36 +441,6 @@ bool QQuickVTKItemEx::event(QEvent* ev)
   ev->accept();
 
   return true;
-}
-
-//-------------------------------------------------------------------------------------------------
-void QQuickVTKItemEx::pinchHandlerRotate(const QPointF& position, double delta)
-{
-  Q_D(QQuickVTKItemEx);
-  auto c = QSharedPointer<QQuickVTKPinchEvent>::create(QQuickVTKPinchEvent::QQuickVTKPinch,
-    QQuickVTKPinchEvent::QQUICKVTK_ROTATE, position, QVector2D(0, 0), 1.0, delta);
-  dispatch_async([d, c](vtkRenderWindow* vtkWindow, vtkUserData) mutable
-    { d->qt2vtkInteractorAdapter.ProcessEvent(c.data(), vtkWindow->GetInteractor()); });
-}
-
-//-------------------------------------------------------------------------------------------------
-void QQuickVTKItemEx::pinchHandlerScale(const QPointF& position, double delta)
-{
-  Q_D(QQuickVTKItemEx);
-  auto c = QSharedPointer<QQuickVTKPinchEvent>::create(QQuickVTKPinchEvent::QQuickVTKPinch,
-    QQuickVTKPinchEvent::QQUICKVTK_SCALE, position, QVector2D(0, 0), delta);
-  dispatch_async([d, c](vtkRenderWindow* vtkWindow, vtkUserData) mutable
-    { d->qt2vtkInteractorAdapter.ProcessEvent(c.data(), vtkWindow->GetInteractor()); });
-}
-
-//-------------------------------------------------------------------------------------------------
-void QQuickVTKItemEx::pinchHandlerTranslate(const QPointF& position, const QVector2D& delta)
-{
-  Q_D(QQuickVTKItemEx);
-  auto c = QSharedPointer<QQuickVTKPinchEvent>::create(
-    QQuickVTKPinchEvent::QQuickVTKPinch, QQuickVTKPinchEvent::QQUICKVTK_TRANSLATE, position, delta);
-  dispatch_async([d, c](vtkRenderWindow* vtkWindow, vtkUserData) mutable
-    { d->qt2vtkInteractorAdapter.ProcessEvent(c.data(), vtkWindow->GetInteractor()); });
 }
 
 #include "QQuickVTKItemEx.moc"

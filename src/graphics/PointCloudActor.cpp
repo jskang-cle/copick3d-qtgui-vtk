@@ -5,6 +5,7 @@
 #include "qdebug.h"
 
 #include <vtkObjectFactory.h>
+
 #include <vtkFloatArray.h>
 #include <vtkPoints.h>
 #include <vtkPointData.h>
@@ -19,8 +20,9 @@
 #include <vtkElevationFilter.h>
 #include <vtkVertexGlyphFilter.h>
 #include <vtkStatisticalOutlierRemoval.h>
-#include <vtkStaticPointLocator.h>
+
 #include <vtkArrayDispatch.h>
+
 #include <vtkProperty.h>
 #include <vtkShaderProperty.h>
 #include <vtkUniforms.h>
@@ -30,7 +32,6 @@
 #include <vtkCamera.h>
 
 #include "vtk/DepthFilter.hpp"
-#include "vtk/PointCloudMapper.hpp"
 
 namespace copick3d::qtgui::graphics
 {
@@ -80,7 +81,7 @@ void PointCloudActor::InitializePipeline()
 
     this->PolyDataProducer->SetOutput(this->PolyData);
     
-#if 0 // defined(DEBUG) || defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
     this->DepthFilter->SetInputConnection(this->PolyDataProducer->GetOutputPort());
 #else
     this->SORFilter->SetInputConnection(this->PolyDataProducer->GetOutputPort());
@@ -226,7 +227,7 @@ void PointCloudActor::UpdatePipeline()
             shaderProp->AddVertexShaderReplacement(
                 "//VTK::Color::Impl", // replace the color implementation block
                 true,                 // before the standard replacements
-                "vertexColorVSOutput = vec4(vec3(normalMC.x, -normalMC.y, -normalMC.z) * 0.5 + 0.5, 1.0);",
+                "vertexColorVSOutput = vec4(normalMC.xyz * 0.5 + 0.5, 1.0);",
                 false // only do it once
             );
             // use the color calculated in vertex shader in fragment shader
@@ -270,11 +271,13 @@ void PointCloudActor::UpdatePipeline()
         mapper->SetColorModeToDirectScalars();
         mapper->SetScalarModeToUsePointFieldData();
         mapper->SetScalarVisibility(1);
+
+        
     }
     else if (this->ColorMode == POINT_COLOR_MODE_SOLID)
     {
         mapper->SetScalarVisibility(0);
-        this->GetProperty()->SetLighting(true);
+        this->GetProperty()->SetLighting(false);
     }
 
     if (this->Mapper != mapper)

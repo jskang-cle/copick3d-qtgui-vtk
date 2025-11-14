@@ -69,6 +69,10 @@ class PointCloudView : public QQuickVTKItemEx
         READ axisGridVisible
         WRITE setAxisGridVisible
         NOTIFY axisGridVisibleChanged)
+    Q_PROPERTY(float innerPadding 
+        READ innerPadding 
+        WRITE setInnerPadding 
+        NOTIFY innerPaddingChanged)
     
     // Q_PROPERTY(PointCloudColorMap colorMap 
     //     READ colorMap
@@ -110,6 +114,11 @@ public:
 
     QVector3D pickedPoint() const { return m_pickedPoint; }
 
+    float innerPadding() const { return m_innerPadding; }
+    void setInnerPadding(float padding);
+
+    Q_INVOKABLE void resetCamera();
+
 signals:
     void frameChanged(QSharedPointer<copick3d::Frame> frame);
     void parallelProjectionChanged(bool enable);
@@ -119,7 +128,8 @@ signals:
     void pointSizeChanged(float size);
     void backgroundColorChanged(const QColor color);
     void axisGridVisibleChanged(bool visible);
-    
+    void innerPaddingChanged(float padding);
+
     void pickedPointChanged(QVector3D pickedPoint);
 
 private:
@@ -133,6 +143,8 @@ private:
     float m_pointSize = 1.0f;
     QColor m_backgroundColor = QColor(25, 25, 25);
     bool m_axisGridVisible = true;
+
+    float m_innerPadding = 30.0f;
 
     QVector3D m_pickedPoint = QVector3D(0.0f, 0.0f, 0.0f);
 };

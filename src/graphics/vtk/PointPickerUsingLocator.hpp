@@ -38,13 +38,7 @@ vtkIdType RobustIntersectWithLine(vtkStaticPointLocator* locator,
                                   double ptX[3], vtkIdType& ptId)
 {
     // Try multiple tolerance values
-    double tolerances[] = 
-    {
-        baseTolerance, 
-        baseTolerance * 2.0, 
-        baseTolerance * 5.0, 
-        baseTolerance * 10.0
-    };
+    double tolerances[] = {baseTolerance, baseTolerance * 5.0, baseTolerance * 10.0};
     
     for (int i = 0; i < 4; i++)
     {
@@ -89,17 +83,21 @@ double PointPickerUsingLocator::IntersectWithLine(
             double lineX[3];
             double ptX[3];
 
-            if (RobustIntersectWithLine(
-                    staticLocator, 
-                    const_cast<double*>(p1), 
-                    const_cast<double*>(p2), 
-                    0.1, t, lineX, ptX, ptId)
-                )
+            // vtkLog(INFO, << "Using static point locator for picking"
+            //              << " p1: " << p1[0] << ", " << p1[1] << ", " << p1[2]
+            //              << " p2: " << p2[0] << ", " << p2[1] << ", " << p2[2]
+            //              << " tol: " << tol);
+
+            // if (staticLocator->IntersectWithLine((double*)p1, (double*)p2, 2.0, t, lineX, ptX, ptId))
+            if (RobustIntersectWithLine(staticLocator, (double*)p1, (double*)p2, 0.1, t, lineX, ptX, ptId))
             {
                 if (t >= 0 && t < this->GlobalTMin && ptId >= 0)
                 {
                     this->MarkPickedData(path, t, ptX, mapper, dataSet, -1);
                     this->PointId = ptId;
+                    // vtkLog(INFO, << "Picked point id: " << ptId
+                    //              << " at: " << ptX[0] << ", " << ptX[1] << ", " << ptX[2]
+                    //              << " t: " << t);
                     return t;
                 }
             }

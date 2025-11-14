@@ -194,6 +194,13 @@ ApplicationWindow {
     focusPolicy: Qt.StrongFocus
     colorMode: colorModeCombo.currentValue
     frame: loader.frame
+
+    Timer {
+      interval: 10
+      running: true
+      repeat: true
+      onTriggered: pcview.update()
+    }
   }
 
   Text {

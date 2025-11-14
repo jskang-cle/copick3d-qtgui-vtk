@@ -44,7 +44,6 @@ qt_add_executable(${PROGRAM_NAME}
     src/graphics/vtk/DepthFilter.cpp
     src/graphics/vtk/vtkCameraOrientationWidgetEx.cpp
     src/graphics/vtk/QQuickVTKItemEx.cpp
-    src/graphics/vtk/LineActor.cpp
 )
 
 qt_add_qml_module(${PROGRAM_NAME}
