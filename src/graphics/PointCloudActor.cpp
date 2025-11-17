@@ -86,7 +86,7 @@ void PointCloudActor::InitializePipeline()
 #else
     this->SORFilter->SetInputConnection(this->PolyDataProducer->GetOutputPort());
     this->SORFilter->SetSampleSize(50);
-    this->SORFilter->SetStandardDeviationFactor(0.5);
+    this->SORFilter->SetStandardDeviationFactor(1.0);
     this->DepthFilter->SetInputConnection(this->SORFilter->GetOutputPort());
 #endif
 
@@ -186,25 +186,6 @@ void PointCloudActor::UpdatePipeline()
         mapper->SetScalarVisibility(1);
         
         this->GetProperty()->SetLighting(false);
-
-        // if (this->FixedPointSize)
-        // {
-        //     shaderProp->AddVertexShaderReplacement(
-        //         "= scalarColor", // replace the color implementation block
-        //         false,                 // after the standard replacements
-        //         "= vec4(scalarColor.bgr, 1.0)",
-        //         false // only do it once
-        //     );
-        // }
-        // else
-        // {
-        //     shaderProp->AddVertexShaderReplacement(
-        //         "=  glyphColor;", // replace the color implementation block
-        //         false,                 // after the standard replacements
-        //         "=  vec4(glyphColor.bgr, 1.0);",
-        //         false // only do it once
-        //     );
-        // }
     }
     else if (this->ColorMode == POINT_COLOR_MODE_NORMAL)
     {
@@ -232,7 +213,7 @@ void PointCloudActor::UpdatePipeline()
             );
             // use the color calculated in vertex shader in fragment shader
             shaderProp->AddFragmentShaderReplacement(
-                "//VTK::Color::Dec", // replace the normal block
+                "//VTK::Color::Dec", // replace the color declaration block
                 true,                 // before the standard replacements
                 "in vec4 vertexColorVSOutput;\n"
                 "//VTK::Color::Dec",

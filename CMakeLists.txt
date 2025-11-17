@@ -31,6 +31,11 @@ find_package(copick3d_api REQUIRED
     HINTS "D:/repos/copick3d_api/build/install"
 )
 
+set_target_properties(copick3d_api::copick3d_api PROPERTIES
+    MAP_IMPORTED_CONFIG_MINSIZEREL Release
+    MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+)
+
 qt_standard_project_setup()
 
 qt_add_executable(${PROGRAM_NAME}
