@@ -46,6 +46,14 @@ public:
     void Pan() override;
     void Dolly() override;
 
+    vtkGetVector3Macro(HomePosition, double);
+    vtkSetVector3Macro(HomePosition, double);
+
+    vtkGetVector3Macro(HomeUp, double);
+    vtkSetVector3Macro(HomeUp, double);
+
+    vtkGetVector3Macro(HoveredPoint, double);
+
 protected:
     CoPickInteractorStyle();
     ~CoPickInteractorStyle() override;
@@ -65,6 +73,5 @@ private:
 
     bool GetPickedPoint(double pickedPos[3]);
 
-    vtkNew<vtkActor> PointHighlightActor;
-    float HoveredPoint[3] = {0.0f, 0.0f, 0.0f};
+    double HoveredPoint[3] = {0.0, 0.0, 0.0};
 };

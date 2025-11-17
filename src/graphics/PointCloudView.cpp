@@ -40,6 +40,8 @@
 #include <algorithm>
 #include <vtkHardwarePicker.h>
 #include <vtkPointPicker.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCursor3D.h>
 
 #include "vtk/CoPickInteractorStyle.hpp"
 #include "vtk/PointPickerUsingLocator.hpp"
@@ -65,6 +67,7 @@ struct PointCloudViewData : vtkObject
     vtkNew<PointCloudActor> actor;
 
     vtkNew<vtkCubeAxesActor> cubeAxesActor;
+    vtkNew<vtkActor> PointHighlightActor;
 };
 
 vtkStandardNewMacro(PointCloudViewData);
@@ -80,6 +83,25 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     data->renderer->SetBackground(this->m_backgroundColor.redF(),
                                  this->m_backgroundColor.greenF(),
                                  this->m_backgroundColor.blueF());
+                                 
+    vtkNew<vtkCursor3D> cross;
+    cross->AllOff();
+    cross->AxesOn();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(cross->GetOutputPort());
+    mapper->SetResolveCoincidentTopologyToOff();
+    mapper->Update();
+
+    double CURSOR_COLOR[3] = {1.0, 1.0, 1.0};
+    double CROSS_LINE_WIDTH = 3.0;
+    data->PointHighlightActor->SetMapper(mapper);
+    data->PointHighlightActor->GetProperty()->SetColor(CURSOR_COLOR);
+    data->PointHighlightActor->GetProperty()->SetLineWidth(CROSS_LINE_WIDTH);
+    data->PointHighlightActor->SetVisibility(false);
+    data->PointHighlightActor->PickableOff();
+    data->PointHighlightActor->UseBoundsOff();
+    data->renderer->AddActor(data->PointHighlightActor);
 
     renderWindow->AddRenderer(data->renderer);
     renderWindow->SetMultiSamples(8);
@@ -87,6 +109,42 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     vtkNew<CoPickInteractorStyle> style;
     style->SetDefaultRenderer(data->renderer);
     renderWindow->GetInteractor()->SetInteractorStyle(style);
+
+    // subscribe to point hover events
+    vtkCallbackCommand* pointHoverCallback = vtkCallbackCommand::New();
+    pointHoverCallback->SetClientData(this);
+    pointHoverCallback->SetCallback([](vtkObject* caller, unsigned long eid, void* clientdata, void* calldata)
+    {
+        PointCloudView* _this = static_cast<PointCloudView*>(clientdata);
+        CoPickInteractorStyle* style = static_cast<CoPickInteractorStyle*>(caller);
+
+        double hoveredPoint[3];
+        style->GetHoveredPoint(hoveredPoint);
+
+        QVector3D point(static_cast<float>(hoveredPoint[0]),
+                        static_cast<float>(hoveredPoint[1]),
+                        static_cast<float>(hoveredPoint[2]));
+
+        _this->m_pickedPoint = point;
+        Q_EMIT _this->pickedPointChanged(point);
+    });
+
+    vtkCallbackCommand* pointCursorCallback = vtkCallbackCommand::New();
+    pointCursorCallback->SetClientData(data);
+    pointCursorCallback->SetCallback([](vtkObject* caller, unsigned long eid, void* clientdata, void* calldata)
+    {
+        PointCloudViewData* data = static_cast<PointCloudViewData*>(clientdata);
+        CoPickInteractorStyle* style = static_cast<CoPickInteractorStyle*>(caller);
+
+        double hoveredPoint[3];
+        style->GetHoveredPoint(hoveredPoint);
+
+        data->PointHighlightActor->SetPosition(hoveredPoint);
+        data->PointHighlightActor->SetVisibility(true);
+    });
+
+    style->AddObserver(CoPickInteractorStyle::PointHovered, pointHoverCallback);
+    style->AddObserver(CoPickInteractorStyle::PointHovered, pointCursorCallback);
 
     data->renderer->AddActor(data->actor);
 
@@ -100,32 +158,15 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
 
     data->renderer->AddActor(data->cubeAxesActor);
 
-    // data->renderer->ResetCamera();
-
-    // auto rep = vtkSmartPointer<vtkAxesActor>::New();
-    // data->orientationWidget->SetOrientationMarker(rep);
-    // data->orientationWidget->SetInteractor(renderWindow->GetInteractor());
-    // data->orientationWidget->SetEnabled(1);
-    // data->orientationWidget->InteractiveOff();
-
-    // auto orientationWidget = vtkOrientationMarkerWidget::New();
-    // orientationWidget->SetOrientationMarker(vtkSmartPointer<vtkAxesActor>::New());
-    // orientationWidget->SetInteractor(renderWindow->GetInteractor());
-    // orientationWidget->SetEnabled(1);
-    // orientationWidget->InteractiveOff();
-    // data->orientationWidget = orientationWidget;
-
     data->cameraWidget->SetParentRenderer(data->renderer);
     data->cameraWidget->SetInteractor(renderWindow->GetInteractor());
     data->cameraWidget->SetEnabled(1);
     data->cameraWidget->GetDefaultRenderer()->GetActiveCamera()->ParallelProjectionOn();
     // data->cameraWidget->AnimateOff();
     // data->cameraWidget->SetProcessEvents(false);
+
     auto rep = vtkCameraOrientationRepresentation::SafeDownCast(data->cameraWidget->GetRepresentation());
-    if (rep)
-    {
-        rep->SetPadding(this->m_innerPadding, this->m_innerPadding);
-    }
+    rep->SetPadding(this->m_innerPadding, this->m_innerPadding);
 
     auto cam = data->renderer->GetActiveCamera();
     cam->SetPosition(0, 0, 0);
@@ -134,22 +175,7 @@ QQuickVTKItem::vtkUserData PointCloudView::initializeVTK(vtkRenderWindow *render
     cam->SetClippingRange(1.0, 2000.0);
 
     vtkNew<PointPickerUsingLocator> picker;
-    // picker->SetSnapToMeshPoint(true);
     renderWindow->GetInteractor()->SetPicker(picker);
-
-    // // add sphere actor for testing
-    // vtkNew<vtkSphereSource> sphere;
-    // sphere->SetCenter(0.0, 0.0, 0.0);
-    // sphere->SetRadius(5.0);
-    // sphere->SetThetaResolution(32);
-    // sphere->SetPhiResolution(32);
-
-    // vtkNew<vtkPolyDataMapper> sphereMapper;
-    // sphereMapper->SetInputConnection(sphere->GetOutputPort());
-    // vtkNew<vtkActor> sphereActor;
-    // sphereActor->SetMapper(sphereMapper);
-
-    // data->renderer->AddActor(sphereActor);
 
     return data;
 }
@@ -187,6 +213,7 @@ void PointCloudView::resetCamera()
 SET_WITH_DISPATCH(setFrame, QSharedPointer<copick3d::Frame>, m_frame, frame, frameChanged,
     data->actor->SetFrame(frame);
     data->cubeAxesActor->SetBounds(data->actor->GetBounds());
+    data->PointHighlightActor->SetVisibility(false);
 
     data->renderer->ResetCameraClippingRange();
     data->renderer->ResetCamera();
@@ -204,6 +231,12 @@ SET_WITH_DISPATCH(setFixedPointSize, bool, m_fixedPointSize, enable, fixedPointS
 SET_WITH_DISPATCH(setColorMode, PointCloudColorMode, m_colorMode, mode, colorModeChanged,
     PointCloudActor* actor = data->actor;
     actor->SetColorMode(static_cast<PointCloudActor::PointColorMode>(mode));
+)
+
+
+SET_WITH_DISPATCH(setColorMap, PointCloudColorMap, m_colorMap, map, colorMapChanged,
+    PointCloudActor* actor = data->actor;
+    actor->SetColorMap(static_cast<PointCloudActor::PointColorMap>(map));
 )
 
 SET_WITH_DISPATCH(setPointSize, float, m_pointSize, size, pointSizeChanged,

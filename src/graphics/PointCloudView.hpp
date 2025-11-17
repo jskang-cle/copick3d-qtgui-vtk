@@ -6,6 +6,8 @@
 #include <copick3d/copick3d_api.hpp>
 #include "vtk/QQuickVTKItemEx.hpp"
 
+#include "ColormapPreset.hpp"
+
 
 namespace copick3d::qtgui::graphics
 {
@@ -29,11 +31,11 @@ class PointCloudView : public QQuickVTKItemEx
 
     enum PointCloudColorMap
     {
-        Gray = 0,
-        Warm = 1,
-        Cool = 2,
-        Jet = 3,
-        Rainbow = 4,
+        Gray = ColormapPreset::Gray,
+        Plasma = ColormapPreset::Plasma,
+        Viridis = ColormapPreset::Viridis,
+        Twilight = ColormapPreset::Twilight,
+        Turbo = ColormapPreset::Turbo,
     };
 
     Q_ENUM(PointCloudRenderType)
@@ -73,11 +75,10 @@ class PointCloudView : public QQuickVTKItemEx
         READ innerPadding 
         WRITE setInnerPadding 
         NOTIFY innerPaddingChanged)
-    
-    // Q_PROPERTY(PointCloudColorMap colorMap 
-    //     READ colorMap
-    //     WRITE setColorMap
-    //     NOTIFY colorMapChanged)
+    Q_PROPERTY(PointCloudColorMap colorMap 
+        READ colorMap
+        WRITE setColorMap
+        NOTIFY colorMapChanged)
     
     Q_PROPERTY(QVector3D pickedPoint
         READ pickedPoint
@@ -100,8 +101,8 @@ public:
     PointCloudColorMode colorMode() const { return m_colorMode; }
     void setColorMode(PointCloudColorMode mode);
 
-    // PointCloudColorMap colorMap() const;
-    // void setColorMap(PointCloudColorMap map);
+    PointCloudColorMap colorMap() const { return m_colorMap; }
+    void setColorMap(PointCloudColorMap map);
 
     float pointSize() const { return m_pointSize; }
     void setPointSize(float size);
@@ -124,7 +125,7 @@ signals:
     void parallelProjectionChanged(bool enable);
     void fixedPointSizeChanged(bool enable);
     void colorModeChanged(PointCloudColorMode mode);
-    // void colorMapChanged(PointCloudColorMap map);
+    void colorMapChanged(PointCloudColorMap map);
     void pointSizeChanged(float size);
     void backgroundColorChanged(const QColor color);
     void axisGridVisibleChanged(bool visible);
@@ -140,6 +141,7 @@ private:
     bool m_parallelProjection = false;
     bool m_fixedPointSize = false;
     PointCloudColorMode m_colorMode = PointCloudColorMode::Texture;
+    PointCloudColorMap m_colorMap = PointCloudColorMap::Gray;
     float m_pointSize = 1.0f;
     QColor m_backgroundColor = QColor(25, 25, 25);
     bool m_axisGridVisible = true;

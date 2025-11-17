@@ -25,24 +25,6 @@ vtkStandardNewMacro(CoPickInteractorStyle);
 CoPickInteractorStyle::CoPickInteractorStyle()
 {
     this->MotionFactor = 10.0;
-    
-    vtkNew<vtkCursor3D> cross;
-    cross->AllOff();
-    cross->AxesOn();
-
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(cross->GetOutputPort());
-    // Disabling it gives better results when zooming close
-    // to the picked actor in the scene
-    mapper->SetResolveCoincidentTopologyToOff();
-    mapper->Update();
-
-    double CURSOR_COLOR[3] = {1.0, 1.0, 1.0};
-    double CROSS_LINE_WIDTH = 3.0;
-
-    this->PointHighlightActor->SetMapper(mapper);
-    this->PointHighlightActor->GetProperty()->SetColor(CURSOR_COLOR);
-    this->PointHighlightActor->GetProperty()->SetLineWidth(CROSS_LINE_WIDTH);
 }
 
 CoPickInteractorStyle::~CoPickInteractorStyle() = default;
@@ -57,12 +39,11 @@ void CoPickInteractorStyle::OnMouseMove()
 {
     int x = this->Interactor->GetEventPosition()[0];
     int y = this->Interactor->GetEventPosition()[1];
-
     
     vtkRenderWindowInteractor *rwi = this->Interactor;
     int shift = rwi->GetShiftKey();
 
-    if (shift)
+    if (true /*&& !shift*/)
     {
         double cursorPos[3];
         if (this->GetPickedPoint(cursorPos))
@@ -70,10 +51,6 @@ void CoPickInteractorStyle::OnMouseMove()
             HoveredPoint[0] = cursorPos[0];
             HoveredPoint[1] = cursorPos[1];
             HoveredPoint[2] = cursorPos[2];
-
-            this->PointHighlightActor->SetPosition(cursorPos);
-            this->PointHighlightActor->SetVisibility(true);
-            this->Interactor->GetRenderWindow()->GetRenderers()->GetFirstRenderer()->AddActor(this->PointHighlightActor);
 
             this->InvokeEvent(PointHovered, cursorPos);
         }
@@ -471,11 +448,12 @@ void CoPickInteractorStyle::ResetToHomePosition()
         return;
     }
 
-    vtkRenderWindowInteractor *rwi = this->Interactor;
+    this->CurrentRenderer->ResetCamera();    
     auto cam = this->CurrentRenderer->GetActiveCamera();
     cam->SetPosition(this->HomePosition);
     cam->SetViewUp(this->HomeUp);
     this->CurrentRenderer->ResetCamera();
+    this->CurrentRenderer->ResetCameraClippingRange();
     // rwi->Render();
 }
 
@@ -501,7 +479,7 @@ bool CoPickInteractorStyle::GetPickedPoint(double pickedPos[3])
         return false;
     }
 
-    if (picker->Pick(x, y, 0.0, this->CurrentRenderer) == 0)
+    if (picker->Pick(x, y, 0.0, renderer) == 0)
     {
         return false;
     }

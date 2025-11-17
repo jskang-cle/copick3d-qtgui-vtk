@@ -61,6 +61,8 @@ qt6_add_resources(${PROGRAM_NAME} ${PROGRAM_NAME}
         "qml/main.qml"
 )
 
+qt_finalize_executable(${PROGRAM_NAME})
+
 target_link_libraries(${PROGRAM_NAME} PRIVATE
     copick3d_api::copick3d_api
     Qt6::Core 

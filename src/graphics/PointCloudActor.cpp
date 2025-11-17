@@ -268,11 +268,13 @@ void PointCloudActor::UpdatePipeline()
         this->GetProperty()->SetLighting(false);
 
         mapper->SelectColorArray("Depth");
-        mapper->SetColorModeToDirectScalars();
+        mapper->SetColorModeToMapScalars();
         mapper->SetScalarModeToUsePointFieldData();
         mapper->SetScalarVisibility(1);
 
-        
+        auto lut = GetColormapLookupTable(
+            static_cast<ColormapPreset>(this->ColorMap));
+        mapper->SetLookupTable(lut);
     }
     else if (this->ColorMode == POINT_COLOR_MODE_SOLID)
     {

@@ -150,8 +150,10 @@ ApplicationWindow {
 
       ComboBox {
         id: colorMapCombo
-        model: ["Gray", "Hot", "Cool", "Jet", "HSV", "Pink"]
+        enabled: colorModeCombo.currentValue === PointCloudView.Depth
+        model: ["Gray", "Plasma", "Viridis", "Twilight", "Turbo"]
         currentIndex: 0
+        onCurrentIndexChanged: pcview.colorMap = currentIndex
       }
     }
   }
@@ -203,16 +205,28 @@ ApplicationWindow {
     }
   }
 
-  Text {
-    id: pickedPointText
+  Rectangle {
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.margins: 10
-    color: "white"
-    font.pixelSize: 14
-    text: {
-      let p = pcview.pickedPoint
-      return `Picked Point: (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`
+    color: "#80000000"
+    radius: 4
+
+    // padding around text
+    property int padding: 6
+    width: pickedPointText.width + padding * 2
+    height: pickedPointText.height + padding * 2
+
+    Text {
+        id: pickedPointText
+        anchors.centerIn: parent
+        color: "white"
+        font.family: "Consolas"
+        font.pixelSize: 14
+        text: {
+            let p = pcview.pickedPoint
+            return `Picked Point: (${p.x.toFixed(2).padStart(8, ' ')}, ${p.y.toFixed(2).padStart(8, ' ')}, ${p.z.toFixed(2).padStart(8, ' ')})`
+        }
     }
   }
 }

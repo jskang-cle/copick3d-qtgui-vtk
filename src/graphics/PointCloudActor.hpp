@@ -7,6 +7,8 @@
 
 #include <qsharedpointer.h>
 
+#include "ColormapPreset.hpp"
+
 // Forward declarations
 class vtkFloatArray;
 class vtkPoints;
@@ -56,15 +58,16 @@ public:
     vtkSetClampMacro(ColorMode, int, POINT_COLOR_MODE_RGB, POINT_COLOR_MODE_SOLID);
 
     enum PointColorMap
-    {
-        POINT_COLOR_MAP_JET = 0,
-        POINT_COLOR_MAP_WARM = 1,
-        POINT_COLOR_MAP_COOL = 2,
-        POINT_COLOR_MAP_GRAY = 3,
+    { 
+        POINT_COLOR_MAP_Gray = ColormapPreset::Gray,
+        POINT_COLOR_MAP_Plasma = ColormapPreset::Plasma,
+        POINT_COLOR_MAP_Viridis = ColormapPreset::Viridis,
+        POINT_COLOR_MAP_Twilight = ColormapPreset::Twilight,
+        POINT_COLOR_MAP_Turbo = ColormapPreset::Turbo,
     };
 
     vtkGetMacro(ColorMap, int);
-    vtkSetClampMacro(ColorMap, int, POINT_COLOR_MAP_JET, POINT_COLOR_MAP_GRAY);
+    vtkSetClampMacro(ColorMap, int, POINT_COLOR_MAP_Gray, POINT_COLOR_MAP_Turbo);
 
     vtkGetMacro(PointSize, double);
     vtkSetClampMacro(PointSize, double, 0.1, 5.0);
@@ -110,7 +113,7 @@ private:
 
     bool FixedPointSize = false;
     int ColorMode = POINT_COLOR_MODE_RGB;
-    int ColorMap = POINT_COLOR_MAP_JET;
+    int ColorMap = POINT_COLOR_MAP_Gray;
 };
 
 } // namespace copick3d::qtgui::graphics
