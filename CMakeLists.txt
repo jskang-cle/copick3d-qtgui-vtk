@@ -36,6 +36,8 @@ qt_standard_project_setup()
 qt_add_executable(${PROGRAM_NAME}
     MANUAL_FINALIZATION
     src/main.cpp
+
+    src/graphics/ColormapPreset.cpp
     src/graphics/PointCloudActor.cpp
     src/graphics/PointCloudView.cpp
     src/graphics/PointCloudLoader.cpp
