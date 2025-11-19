@@ -208,7 +208,7 @@ void PointCloudActor::UpdatePipeline()
             shaderProp->AddVertexShaderReplacement(
                 "//VTK::Color::Impl", // replace the color implementation block
                 true,                 // before the standard replacements
-                "vertexColorVSOutput = vec4(normalMC.xyz * 0.5 + 0.5, 1.0);",
+                "vertexColorVSOutput = vec4(normalMC.xyz * vec3(1, -1, -1) * 0.5 + 0.5, 1.0);",
                 false // only do it once
             );
             // use the color calculated in vertex shader in fragment shader
